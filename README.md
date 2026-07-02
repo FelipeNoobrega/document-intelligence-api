@@ -249,6 +249,9 @@ is part of using the right tool for the job:
   avoids exposing the service to server-side request forgery (SSRF). This follows
   MarkItDown's own guidance to call the narrowest `convert_*` function needed
   (see [References](#references)).
+- **LLM privacy (V2).** The summarize endpoint sends the converted document to Google's Gemini API.
+  On the free tier,Google may use submitted data to improve its products and may subject it to human review. Do not send sensitive or confidential documents when using the free tier. For private data, a paid tier (which excludes data from training) or a zero-data-retention configuration is required.
+
 
 ---
 
