@@ -135,12 +135,21 @@ document-intelligence-api/
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR-USERNAME/document-intelligence-api.git
+git clone https://github.com/felipenoobrega/document-intelligence-api.git
 cd document-intelligence-api
 
-# Create and activate a virtual environment
+# Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate        # On Windows: .venv\Scripts\Activate.ps1
+
+#Activate the virtual environment
+macOS/Linux
+
+source .venv/bin/activate
+
+Windows PowerShell
+
+.venv\Scripts\Activate.ps1
+
 
 # Install dependencies
 pip install -r requirements.txt
