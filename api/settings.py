@@ -7,8 +7,8 @@ class Settings(BaseSettings):
    
     api_key: str
     max_file_size_mb: int = 10
-    grmini_api_key: str
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_api_key: str
+    gemini_model: str = "gemini-3.5-flash"
 
 @lru_cache
 def get_settings() -> Settings:
