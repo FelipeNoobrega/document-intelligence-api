@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
+
 from api.main import app
 from api.routers.documents import get_document_service
 from api.dependencies import verify_api_key
