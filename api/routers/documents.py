@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+
 from api.dependencies import verify_api_key
 from api.schemas import ConversorResponse
 from api.services.document_service import DocumentService
@@ -16,8 +19,8 @@ async def convert_document(
     file: UploadFile = File(...),
     service: DocumentService = Depends(get_document_service),
 ):
-    file_name = file.filename or "unknow"
-    extension = "." + file_name.rsplit(".", 1)[-1].lower()
+    file_name = file.filename or "unknown"
+    extension = Path(file_name).suffix.lower()
 
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -30,7 +33,7 @@ async def convert_document(
 
     if len(file_bytes) > max_bytes:
         raise HTTPException(
-            status_code=status.HTTP_431_REQUEST_HEADER_FIELDS_TOO_LARGE,
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File exceeds {get_settings().max_file_size_mb} MB limit."
         )
     
