@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 
-class ConversorResponse(BaseModel):
+class ConvertResponse(BaseModel):
     file_name: str
     markdown: str
-    markkdown_length: int
+    markdown_length: int
 
 
 class SummarizeResponse(BaseModel):
@@ -11,3 +11,11 @@ class SummarizeResponse(BaseModel):
     summary: str
     summary_length: int
     original_markdown_length: int
+
+
+class AskResponse(BaseModel):
+    file_name: str
+    question: str
+    answer: str
+    original_markdown_length: int
+    question_length: int

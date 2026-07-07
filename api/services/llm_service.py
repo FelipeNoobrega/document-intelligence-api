@@ -36,3 +36,33 @@ class LLMService:
             raise LLMError("Gemini returned an empty response.")
 
         return response.text.strip()
+    
+    def ask(self, markdown: str, question: str) -> str:
+        system_instruction = (
+            "You are a document-based assistant. "
+            "Answer the user's question using only the provided document. "
+            "Do not invent, assume, or recreate information that is not present in the document. "
+            "If the answer is not available in the document, say that the document does not contain enough information."
+        )
+
+        prompt = (
+            f"Document: {markdown}"
+            f"Question: {question}"
+            "Answer:"
+        )
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.2,
+                ),
+            )
+        except errors.APIError as error:
+            raise LLMError(f"Gemini request failed: {error}") from error
+
+        if not response.text:
+            raise LLMError("Gemini returned an empty response.")
+
+        return response.text.strip()
