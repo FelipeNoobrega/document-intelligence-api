@@ -1,9 +1,9 @@
 # Document Intelligence API
 
 A FastAPI service that converts real-world documents (PDF, DOCX, PPTX, XLSX) into
-clean, **LLM-ready Markdown**, then optionally summarizes them through an LLM —
-reducing the token overhead of feeding raw documents to a model, and improving
-answer quality before any AI model touches the content.
+clean, **LLM-ready Markdown**, then summarizes them or answers questions about
+them through an LLM — reducing the token overhead of feeding raw documents to a
+model, and improving answer quality before any AI model touches the content.
 
 This project sits at the **document ingestion layer**: the step *between* messy
 source files and an LLM pipeline. Feeding raw PDFs to a language model is
@@ -11,7 +11,7 @@ expensive, because each page is often processed as an image, inflating token
 usage. Converting to structured Markdown first strips that overhead while
 preserving the document's structure (headings, lists, tables). Quantifying the
 exact saving — a side-by-side comparison with and without the conversion step —
-is part of the [Roadmap](#roadmap).
+is on the [Roadmap](#roadmap).
 
 ---
 
@@ -26,11 +26,11 @@ that introduced its own storage and query costs.
 
 Now, building personal projects that also rely on LLMs, I kept running into the
 same problem. This project is my attempt to address it using Microsoft's
-open-source MarkItDown library: the first version converts documents into
-Markdown, and the current version forwards that Markdown to an LLM for
-summarization. The goal is to improve the model's answers while reducing token
-usage — which is why a planned feature is a side-by-side token-cost comparison,
-with and without the conversion step.
+open-source MarkItDown library: documents are first converted into Markdown, and
+that Markdown is then forwarded to an LLM for summarization or question
+answering. The goal is to improve the model's answers while reducing token usage
+— which is why a planned feature is a side-by-side token-cost comparison, with
+and without the conversion step.
 
 ---
 
@@ -63,6 +63,12 @@ with and without the conversion step.
 
 - Convert a document and summarize it through Google's Gemini API in one request,
   with a configurable maximum summary length.
+
+**LLM question answering**
+
+- Convert a document and ask a natural-language question about it. The model is
+  instructed to answer using only the document, and to say when the answer is not
+  present rather than inventing one.
 
 **Cross-cutting**
 
@@ -97,9 +103,10 @@ Client → Router  ─────────│ DocumentService      │→ Ma
   enforce authentication, orchestrate the services, and shape the response. They
   contain no conversion or LLM logic.
 - **Services** contain the actual business logic. `DocumentService` handles
-  conversion (MarkItDown); `LLMService` handles summarization (Gemini). Neither
-  knows anything about HTTP, which makes them easy to test in isolation and reuse.
-  The `/summarize` endpoint composes both.
+  conversion (MarkItDown); `LLMService` handles summarization and question
+  answering (Gemini). Neither knows anything about HTTP, which makes them easy to
+  test in isolation and reuse. The `/summarize` and `/ask` endpoints compose both
+  services.
 - **Settings** load configuration from environment variables, keeping secrets out
   of the codebase.
 
@@ -122,11 +129,11 @@ document-intelligence-api/
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   ├── health.py         # GET /v1/health
-│   │   └── documents.py      # POST /v1/documents/convert, /summarize
+│   │   └── documents.py      # POST /v1/documents/convert, /summarize, /ask
 │   └── services/
 │       ├── __init__.py
 │       ├── document_service.py   # MarkItDown conversion logic
-│       └── llm_service.py        # Gemini summarization logic
+│       └── llm_service.py        # Gemini summarization and Q&A logic
 │
 ├── tests/
 │   └── test_api_documents.py
@@ -175,12 +182,12 @@ Copy `.env.example` to `.env` and fill in the values:
 cp .env.example .env
 ```
 
-| Variable                | Description                                          | Default            |
-| ----------------------- | ---------------------------------------------------- | ------------------ |
-| `APP_API_KEY`           | The key clients must send in the `X-API-Key` header  | —                  |
-| `APP_MAX_FILE_SIZE_MB`  | Maximum accepted upload size, in megabytes           | `10`               |
-| `APP_GEMINI_API_KEY`    | Google Gemini API key (required for `/summarize`)    | —                  |
-| `APP_GEMINI_MODEL`      | Gemini model used for summarization                  | `gemini-2.5-flash` |
+| Variable                | Description                                                       | Default            |
+| ----------------------- | ---------------------------------------------------------------- | ------------------ |
+| `APP_API_KEY`           | The key clients must send in the `X-API-Key` header              | —                  |
+| `APP_MAX_FILE_SIZE_MB`  | Maximum accepted upload size, in megabytes                       | `10`               |
+| `APP_GEMINI_API_KEY`    | Google Gemini API key (required for `/summarize` and `/ask`)     | —                  |
+| `APP_GEMINI_MODEL`      | Gemini model used for summarization and question answering       | `gemini-2.5-flash` |
 
 The `.env` file is git-ignored and never committed. `.env.example` documents the
 required variables without exposing real values.
@@ -229,7 +236,7 @@ Converts an uploaded document to Markdown. **Requires** the `X-API-Key` header.
 
 ```json
 {
-  "filename": "report.pdf",
+  "file_name": "report.pdf",
   "markdown": "# Report Title\n\nDocument content...",
   "markdown_length": 1234
 }
@@ -255,7 +262,7 @@ Optional query parameter: `max_words` (default `150`, range `10`–`1000`).
 
 ```json
 {
-  "filename": "report.pdf",
+  "file_name": "report.pdf",
   "summary": "A concise summary of the document...",
   "summary_length": 320,
   "original_markdown_length": 4820
@@ -269,6 +276,36 @@ Optional query parameter: `max_words` (default `150`, range `10`–`1000`).
 | `400`  | Unsupported file type                         |
 | `401`  | Missing or invalid API key                    |
 | `413`  | File exceeds the configured size limit        |
+| `502`  | The LLM provider (Gemini) failed to respond   |
+
+### `POST /v1/documents/ask`
+
+Converts an uploaded document to Markdown, then answers a natural-language
+question about it via the Gemini API. The model is instructed to answer using
+only the document's content. **Requires** the `X-API-Key` header.
+
+**Request** — `multipart/form-data` with two fields: `file` and `question`.
+
+**Response**
+
+```json
+{
+  "file_name": "report.pdf",
+  "question": "What was the average token reduction?",
+  "answer": "The document reports an average reduction of 54 percent...",
+  "original_markdown_length": 4820,
+  "question_length": 38
+}
+```
+
+**Error responses**
+
+| Status | Meaning                                       |
+| ------ | --------------------------------------------- |
+| `400`  | Unsupported file type                         |
+| `401`  | Missing or invalid API key                    |
+| `413`  | File exceeds the configured size limit        |
+| `422`  | Missing question                              |
 | `502`  | The LLM provider (Gemini) failed to respond   |
 
 ---
@@ -289,12 +326,15 @@ is part of using the right tool for the job:
   avoids exposing the service to server-side request forgery (SSRF). This follows
   MarkItDown's own guidance to call the narrowest `convert_*` function needed
   (see [References](#references)).
-- **LLM privacy.** The `/summarize` endpoint sends the converted document to
-  Google's Gemini API. On the free tier, Google may use submitted data to improve
-  its products and may subject it to human review. Do not send sensitive or
-  confidential documents when using the free tier. For private data, a paid tier
-  (which excludes data from training) or a zero-data-retention configuration is
-  required.
+- **LLM privacy.** The `/summarize` and `/ask` endpoints send the converted
+  document to Google's Gemini API. On the free tier, Google may use submitted data
+  to improve its products and may subject it to human review. Do not send
+  sensitive or confidential documents when using the free tier. For private data,
+  a paid tier (which excludes data from training) or a zero-data-retention
+  configuration is required.
+- **Single-turn question answering.** The `/ask` endpoint answers one question
+  per request and keeps no conversation history — each call is independent. The
+  document is sent with every request.
 
 ---
 
@@ -309,22 +349,23 @@ requiring real files or external API calls. Coverage includes:
 
 - Successful conversion returns `200` with the expected Markdown.
 - Successful summarization returns `200` with the expected summary.
+- Successful question answering returns `200` with the expected answer, and the
+  services are called with the correct arguments.
 - Unsupported file types are rejected with `400`.
 - Requests without a valid API key are rejected with `401`.
-- An LLM provider failure is surfaced as `502`.
+- LLM provider failures are surfaced as `502`.
 
 ---
 
 ## Roadmap
 
-The service currently converts documents and summarizes them through an LLM.
-Planned extensions:
+The service currently converts documents, summarizes them, and answers questions
+about them through an LLM. Planned extensions:
 
 **Next**
 
-- `POST /v1/documents/ask` — convert, then answer questions about the document.
 - Token-cost estimation: report how many tokens the raw document would have cost
-  versus the converted Markdown, quantifying the savings.
+  versus the converted Markdown, quantifying the savings across all LLM endpoints.
 - Structured error handling with shared custom exceptions (e.g.
   `DocumentConversionError`), extracted once there are enough to justify a module.
 
@@ -344,7 +385,7 @@ Planned extensions:
 - **[MarkItDown](https://github.com/microsoft/markitdown)** — document-to-Markdown
   conversion (Microsoft, MIT licensed)
 - **[google-genai](https://pypi.org/project/google-genai/)** — official Google
-  Gemini SDK, used for summarization
+  Gemini SDK, used for summarization and question answering
 - **[Pydantic](https://docs.pydantic.dev/)** — data validation and settings
 - **[Uvicorn](https://www.uvicorn.org/)** — ASGI server
 - **[pytest](https://docs.pytest.org/)** — testing
