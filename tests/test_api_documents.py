@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from api.dependencies import verify_api_key
 from api.main import app
 from api.routers.documents import get_document_service, get_llm_service
-from api.services.llm_service import LLMError
+from api.services.llm_service import LLMError, LLMResult
 
 
 def test_convert_returns_200_and_markdown():
@@ -50,7 +50,12 @@ def test_summarize_returns_200_and_summary():
     fake_doc = MagicMock()
     fake_doc.convert_to_markdown.return_value = "# Title\n\nContent test fake markdown"
     fake_llm = MagicMock()
-    fake_llm.summarize.return_value = "A short summary."
+    fake_llm.summarize.return_value = LLMResult(
+        text="A short summary.",
+        prompt_tokens=100,
+        output_tokens=20,
+        total_tokens=120,
+    )
 
     app.dependency_overrides[get_document_service] = lambda: fake_doc
     app.dependency_overrides[get_llm_service] = lambda: fake_llm
@@ -60,10 +65,15 @@ def test_summarize_returns_200_and_summary():
     files = {"file": ("document.pdf", b"fake bytes", "application/pdf")}
     response = client.post("/v1/documents/summarize?max_words=50", files=files)
 
+    body = response.json()
+
     assert response.status_code == 200
     body = response.json()
     assert body["summary"] == "A short summary."
     assert body["file_name"] == "document.pdf"
+    assert body["prompt_tokens"] == 100
+    assert body["total_tokens"] == 120
+
     app.dependency_overrides.clear()
 
 
@@ -94,7 +104,12 @@ def test_ask_returns_200_and_answer():
     fake_quest = "what is the title?"
 
     fake_llm = MagicMock()
-    fake_llm.ask.return_value = "answer for the document."
+    fake_llm.ask.return_value = LLMResult(
+        text="answer for the document.",
+        prompt_tokens=100,
+        output_tokens=20,
+        total_tokens=120,
+    )
 
     app.dependency_overrides[get_document_service] = lambda: fake_doc
     app.dependency_overrides[get_llm_service] = lambda: fake_llm
@@ -116,6 +131,8 @@ def test_ask_returns_200_and_answer():
         assert body["question"] == fake_quest
         assert body["original_markdown_length"] == len("# Title\n\nContent test fake markdown")
         assert body["question_length"] == len(fake_quest)
+        assert body["prompt_tokens"] == 100
+        assert body["total_tokens"] == 120
 
         fake_doc.convert_to_markdown.assert_called_once_with(
                 b"fake",

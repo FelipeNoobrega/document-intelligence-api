@@ -88,9 +88,13 @@ async def summarize_document(
     
     return SummarizeResponse(
         file_name=file_name,
-        summary=summary,
-        summary_length=len(summary),
+        summary=summary.text,
+        summary_length=len(summary.text),
         original_markdown_length=len(markdown),
+        prompt_tokens=summary.prompt_tokens,
+        output_tokens=summary.output_tokens,
+        total_tokens=summary.total_tokens,
+        
     )
 
 @router.post("/ask", response_model=AskResponse)
@@ -132,7 +136,10 @@ async def ask_document(
     return AskResponse(
         file_name=file_name,
         question=question,
-        answer=answer,
+        answer=answer.text,
         original_markdown_length=len(markdown),
         question_length=len(question),
+        prompt_tokens=answer.prompt_tokens,
+        output_tokens=answer.output_tokens,
+        total_tokens=answer.total_tokens,
     )

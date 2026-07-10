@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from google import genai
 from google.genai import errors, types
 
@@ -7,13 +9,20 @@ from api.settings import Settings
 class LLMError(Exception):
     """Raised when the LLM provider fails to generate a response."""
 
+@dataclass
+class LLMResult:
+    text: str
+    prompt_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+
 
 class LLMService:
     def __init__(self, settings: Settings) -> None:
         self._client = genai.Client(api_key=settings.gemini_api_key)
         self._model = settings.gemini_model
 
-    def summarize(self, markdown: str, max_words: int = 120) -> str:
+    def summarize(self, markdown: str, max_words: int = 120) -> LLMResult:
         system_instruction = (
             "You are a summarization engine. "
             f"Summarize the following document in at most {max_words} words. "
@@ -35,9 +44,14 @@ class LLMService:
         if not response.text:
             raise LLMError("Gemini returned an empty response.")
 
-        return response.text.strip()
+        return LLMResult(
+            text=response.text,
+            prompt_tokens=response.usage_metadata.prompt_token_count,
+            output_tokens=response.usage_metadata.candidates_token_count,
+            total_tokens=response.usage_metadata.total_token_count,
+        )
     
-    def ask(self, markdown: str, question: str) -> str:
+    def ask(self, markdown: str, question: str) -> LLMResult:
         system_instruction = (
             "You are a document-based assistant. "
             "Answer the user's question using only the provided document. "
@@ -65,4 +79,9 @@ class LLMService:
         if not response.text:
             raise LLMError("Gemini returned an empty response.")
 
-        return response.text.strip()
+        return LLMResult(
+            text=response.text,
+            prompt_tokens=response.usage_metadata.prompt_token_count,
+            output_tokens=response.usage_metadata.candidates_token_count,
+            total_tokens=response.usage_metadata.total_token_count,
+        )
