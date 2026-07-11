@@ -36,7 +36,7 @@ async def convert_document(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsuported file type '{extension}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}"
+            detail=f"Unsupported file type '{extension}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}"
         )
     
     file_bytes = await file.read()
@@ -69,7 +69,7 @@ async def summarize_document(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsuported file type '{extension}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}"
+            detail=f"Unsupported file type '{extension}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}"
         )
     
     file_bytes = await file.read()
@@ -117,7 +117,7 @@ async def ask_document(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsuported file type '{extension}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}"
+            detail=f"Unsupported file type '{extension}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}"
         )
     
     file_bytes = await file.read()
@@ -153,7 +153,7 @@ async def ask_document(
 
 
 @router.post("/token-comparison", response_model=CountTokensResponse)
-async def token_percent(
+async def token_comparison(
     file: UploadFile = File(...),
     doc_service: DocumentService = Depends(get_document_service),
     token_service: TokenService = Depends(get_token_service),
