@@ -25,8 +25,8 @@ One alternative was to store the documents as embeddings in a vector store, but
 that introduced its own storage and query costs.
 
 Now, building personal projects that also rely on LLMs, I kept running into the
-same problem. This project is my attempt to address it using Microsoft's
-open-source MarkItDown library: documents are converted into Markdown, and that
+same problem. This project is my attempt to address it using IBM's 
+open-source Docling library: documents are converted into Markdown, and that
 Markdown is forwarded to an LLM for summarization or question answering. Rather
 than *assuming* the conversion reduces cost, the service measures it — and, as it
 turns out, the answer is more nuanced than I expected.
@@ -95,7 +95,7 @@ logic never lives inside HTTP handlers:
 
 ```
                           ┌──────────────────────┐
-                     ─────│ DocumentService      │→ MarkItDown
+                     ─────│ DocumentService      │→ Docling
 Client → Router  ────│    └──────────────────────┘
    (HTTP boundary)   │    ┌──────────────────────┐
    validates input   ─────│ LLMService           │→ Gemini (generate)
@@ -108,8 +108,9 @@ Client → Router  ────│    └─────────────
 - **Routers** handle the HTTP layer: they validate the request, enforce
   authentication, orchestrate the services, and shape the response. They contain
   no conversion, LLM, or token-counting logic.
-- **Services** each own one responsibility. `DocumentService` converts documents
-  (MarkItDown). `LLMService` generates text — summaries and answers (Gemini).
+- **Services** each own one responsibility. `DocumentService` converts documents 
+  (Docling), which applies layout analysis to recover document structure — headings, 
+  tables, and reading order. `LLMService` generates text — summaries and answers (Gemini).
   `TokenService` counts tokens, including uploading a PDF through the Gemini File
   API. None of them know anything about HTTP, which makes them easy to test in
   isolation and to reuse.
@@ -140,7 +141,7 @@ document-intelligence-api/
 │   │   └── documents.py      # convert, summarize, ask, token-comparison
 │   └── services/
 │       ├── __init__.py
-│       ├── document_service.py   # MarkItDown conversion logic
+│       ├── document_service.py   # Docling conversion logic
 │       ├── llm_service.py        # Gemini summarization and Q&A
 │       └── token_service.py      # Gemini File API token counting
 │
@@ -375,6 +376,12 @@ tool for the job:
   server-side request forgery (SSRF). The File API path writes the upload to a
   temporary file, uploads it, and deletes both the remote and local copies in a
   `finally` block so no file is leaked even if counting fails.
+- **Structure recovery is model-based.** Docling uses layout analysis to infer document 
+  structure from PDFs, which encode visual formatting rather than semantic hierarchy. 
+  This recovers headings and tables far better than plain text extraction, but remains 
+  an inference — unusual layouts may still be misread.
+- **Complex tables may lose fidelity.** Spreadsheets with merged cells, formulas, or 
+  multi-row headers can lose information when flattened to Markdown tables.
 - **LLM privacy.** The summarize, ask, and token-comparison endpoints send content
   to Google's Gemini API. On the free tier, Google may use submitted data to
   improve its products and may subject it to human review. Do not send sensitive
@@ -415,6 +422,8 @@ token cost. Planned extensions:
 - Structured error handling with shared custom exceptions, extracted into a module
   once there are enough to justify it.
 - A small refactor to remove duplicated validation across endpoints.
+- Measure conversion latency under load — Docling's layout models are heavier than 
+  text-only extraction.
 
 **Production hardening**
 
@@ -433,8 +442,8 @@ token cost. Planned extensions:
 ## Tech Stack
 
 - **[FastAPI](https://fastapi.tiangolo.com/)** — web framework
-- **[MarkItDown](https://github.com/microsoft/markitdown)** — document-to-Markdown
-  conversion (Microsoft, MIT licensed)
+- **[Docling](https://github.com/docling-project/docling)** — document-to-Markdown
+  conversion with layout analysis (IBM, MIT licensed)
 - **[google-genai](https://pypi.org/project/google-genai/)** — official Google
   Gemini SDK
 - **[Pydantic](https://docs.pydantic.dev/)** — data validation and settings
@@ -445,10 +454,8 @@ token cost. Planned extensions:
 
 ## References
 
-- **MarkItDown — GitHub repository:** <https://github.com/microsoft/markitdown>
-- **MarkItDown — PyPI package:** <https://pypi.org/project/markitdown/>
-- **MarkItDown — Security Considerations:**
-  <https://github.com/microsoft/markitdown/tree/main/packages/markitdown#security-considerations>
+- **Docling — GitHub repository:** <https://github.com/docling-project/docling>
+- **Docling — documentation:** <https://docling-project.github.io/docling/>
 - **Google Gen AI SDK:** <https://googleapis.github.io/python-genai/>
 - **Gemini Files API:** <https://ai.google.dev/gemini-api/docs/files>
 - **FastAPI documentation:** <https://fastapi.tiangolo.com/>
