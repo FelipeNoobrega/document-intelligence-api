@@ -1,14 +1,18 @@
 import io
 
-from markitdown import MarkItDown
+from docling.datamodel.base_models import DocumentStream
+from docling.document_converter import DocumentConverter
+
 
 class DocumentService:
     def __init__(self) -> None:
-        self._converter = MarkItDown()
+        self._converter = DocumentConverter()
 
     def convert_to_markdown(self, file_bytes: bytes, file_name: str) -> str:
-        stream = io.BytesIO(file_bytes)
-        stream.name = file_name
+        document_stream = DocumentStream(
+            name=file_name,
+            stream=io.BytesIO(file_bytes),
+        )
 
-        result = self._converter.convert_stream(stream)
-        return result.text_content
+        result = self._converter.convert(document_stream)
+        return result.document.export_to_markdown()
